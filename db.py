@@ -16,7 +16,7 @@ class Equity(Base):
     ticker = Column(String)
     price = Column(Float)
     shares_outstanding = Column(Float)
-    pe_ratio = Column(Float)
+    market_cap = Column(Float)
     gics_sector = Column(String)
     gics_sub_industry = Column(String)
 
