@@ -39,22 +39,22 @@ def fetch_stock_data(ticker_symbol, start_date, end_date):
     business_days = business_days.date  # Convert to date-only format
     data = data[data.index.isin(business_days)]
 
-    # Fetching shares outstanding (consider adding error handling here)
-    data['Share Count'] = stock.get_shares_full(start=start_date, end=end_date)[1]
-    
-    print(data)
-
     return data
 
 # Function to insert data into the database
-def insert_to_db(ticker_symbol, data):
+def insert_to_db(ticker_symbol, data, sector, industry):
     for index, row in data.iterrows():
+        if row.isnull().values.any():
+            print(f"Null values found for {ticker_symbol} on {index}")
+            continue
         equity = Equity(
             date=index,
             ticker=ticker_symbol,
-            price=row['Close'],
-            shares_outstanding=row['Share Count'],  # Update if yfinance provides shares outstanding
-            market_cap=row['Close'] * row['Share Count'],
+            open=row['Open'],
+            high=row['High'],
+            low=row['Low'],
+            close=row['Close'],
+            volume=row['Volume'],
             gics_sector=sector,
             gics_sub_industry=industry
         )
