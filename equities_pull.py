@@ -13,15 +13,6 @@ session = Session()
 # Read NASDAQ tickers and sort by market cap
 with open('nasdaq_full_tickers.json', 'r') as file:
     nasdaq_tickers = [ticker for ticker in json.load(file) if ticker['country'] == 'United States']
-    # Convert marketCap to float and sort
-    for ticker in nasdaq_tickers:  
-        # Removing commas and converting to float
-        market_cap = ticker['marketCap']
-        if market_cap == '':
-            ticker['marketCap'] = 0.0
-        else:
-            ticker['marketCap'] = float(market_cap.replace(',', '').replace('$', ''))
-    nasdaq_tickers.sort(key=lambda x: x['marketCap'], reverse=True)
 
 # Function to generate business days between two dates
 def business_days(start_date, end_date):
@@ -62,26 +53,36 @@ def insert_to_db(ticker_symbol, data, sector, industry):
     session.commit()
 
 # Main loop to fetch and insert data
-start_date = datetime.now() - pd.DateOffset(years=30)
+start_date = datetime.now() - pd.DateOffset(years=20)
 end_date = datetime.now()
 
-ticker_index = 0
+#Adjust the start_date to the next business day if it's a weekend or holiday
+adjusted_start_date = business_days(start_date, start_date + BDay(5))[0].date()
 
-while ticker_index < len(nasdaq_tickers):
+ticker_index = 0
+companies_with_start_date_data = 0
+counter = 0
+
+while ticker_index < 0:#len(nasdaq_tickers):
     ticker = nasdaq_tickers[ticker_index]
     symbol = ticker['symbol']
     sector = ticker['sector']
     industry = ticker['industry']
 
-    print(sector)
-    print(industry)
-
     try:
         stock_data = fetch_stock_data(symbol, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-        insert_to_db(symbol, stock_data, sector, industry)
+        if adjusted_start_date in stock_data.index:
+            companies_with_start_date_data += 1
+        #insert_to_db(symbol, stock_data, sector, industry)
     except Exception as e:
         print(f"Error fetching data for {symbol}: {e}")
 
     ticker_index += 1
+    counter += 1
+    print(f"percentage complete: {counter/len(nasdaq_tickers) * 100:.2f}%")
+
+print(f"Companies with start date data: {companies_with_start_date_data}")
+print(f"Total companies: {len(nasdaq_tickers)}")
+
 
 session.close()
