@@ -22,6 +22,16 @@ class Equity(Base):
     gics_sector = Column(String)
     gics_sub_industry = Column(String)
 
+class Equity_Stats(Base):
+    __tablename__ = 'equity_stats'
+
+    id = Column(Integer, primary_key=True)
+    sector = Column(String)
+    industry = Column(String)
+    date = Column(Date)
+    change_day = Column(Float)
+    atr = Column(Float)
+
 class Commodity(Base):
     __tablename__ = 'commodities'
 
