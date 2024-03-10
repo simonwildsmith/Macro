@@ -1,16 +1,16 @@
-from sqlalchemy import create_engine, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
-from db import Equity, Equity_Stats, Base
+from db import Equity, Equity_Stats, Base, engine
 from datetime import datetime
 from tqdm import tqdm
 
-# Database configuration
-DATABASE_URI = 'postgresql+psycopg2://postgres:postgres@localhost/db'
-
 # Database setup
-engine = create_engine(DATABASE_URI)
 Session = sessionmaker(bind=engine)
 session = Session()
+
+existing_record = set(
+    session.query(Equity_Stats.date, Equity_Stats.sector, Equity_Stats.industry).all()
+)
 
 def calculate_true_range(high, low, previous_close):
     range1 = high - low
@@ -28,62 +28,80 @@ def calculate_atr(equity):
     return relative_atr
 
 def process_data():
-    # Query all the data from Equities table
-    equities = session.query(Equity).all()
+    print("entered process_data")
 
-    # Data structure to store aggregated data
+    # Set the batch size
+    batch_size = 10000  # Adjust this number based on your system's capability
+    total_records = session.query(Equity).count()
+    print(f"Total records to process: {total_records}")
+
     stats = {}
+    progress_bar = tqdm(total=total_records, desc="Processing data")
 
-    for equity in equities:
-        key = (equity.date, equity.gics_sector, equity.gics_sub_industry)
+    # Process in batches
+    for offset in range(0, total_records, batch_size):
+        equities_batch = session.query(Equity).limit(batch_size).offset(offset).all()
 
-        if key not in stats:
-            stats[key] = {
-                'change_sum': 0, 'change_count': 0, 'atr_sum': 0, 'atr_count': 0
-            }
+        for equity in equities_batch:
 
-        change = ((equity.close - equity.open) / equity.open) * 100
-        atr = calculate_atr(equity)
+            if equity.open == 0:
+                continue
 
-        stats[key]['change_sum'] += change
-        stats[key]['change_count'] += 1
-        stats[key]['atr_sum'] += atr
-        stats[key]['atr_count'] += 1
+            key = (equity.date, equity.gics_sector, equity.gics_sub_industry)
 
-        # Also aggregate data for the entire sector ('all' sub-industries)
-        sector_key = (equity.date, equity.gics_sector, 'all')
-        if sector_key not in stats:
-            stats[sector_key] = {
-                'change_sum': 0, 'change_count': 0, 'atr_sum': 0, 'atr_count': 0
-            }
+            if key not in stats:
+                stats[key] = {'change_weighted_sum': 0, 'volume_sum': 0, 
+                              'atr_weighted_sum': 0, 'atr_volume_sum': 0}
 
-        stats[sector_key]['change_sum'] += change
-        stats[sector_key]['change_count'] += 1
-        stats[sector_key]['atr_sum'] += atr
-        stats[sector_key]['atr_count'] += 1
+            change = ((equity.close - equity.open) / equity.open) * 100
+            atr = calculate_atr(equity)
+
+            # Update sums for weighted average calculations
+            stats[key]['change_weighted_sum'] += change * equity.volume
+            stats[key]['volume_sum'] += equity.volume
+
+            stats[key]['atr_weighted_sum'] += atr * equity.volume
+            stats[key]['atr_volume_sum'] += equity.volume
+
+            # Repeat for sector-wide data
+            sector_key = (equity.date, equity.gics_sector, 'all')
+            if sector_key not in stats:
+                stats[sector_key] = {'change_weighted_sum': 0, 'volume_sum': 0, 
+                                     'atr_weighted_sum': 0, 'atr_volume_sum': 0}
+
+            stats[sector_key]['change_weighted_sum'] += change * equity.volume
+            stats[sector_key]['volume_sum'] += equity.volume
+
+            stats[sector_key]['atr_weighted_sum'] += atr * equity.volume
+            stats[sector_key]['atr_volume_sum'] += equity.volume
+
+            progress_bar.update(1)
+
+        # Free up memory
+        session.expunge_all()
+
+    progress_bar.close()
 
     # Insert or update the data into Equity_Stats
     for key, data in stats.items():
         date, sector, sub_industry = key
-        change_avg = data['change_sum'] / data['change_count']
-        atr_avg = data['atr_sum'] / data['atr_count']
-
-        existing_stat = session.query(Equity_Stats).filter_by(
-            date=date, sector=sector, gics_sub_industry=sub_industry
-        ).first()
-
-        if existing_stat:
-            # Update existing record
-            existing_stat.change_day = change_avg
-            existing_stat.atr = atr_avg
+        if data['volume_sum'] > 0:
+            change_avg_weighted = data['change_weighted_sum'] / data['volume_sum']
+            atr_avg_weighted = data['atr_weighted_sum'] / data['atr_volume_sum']
         else:
-            # Insert new record
+            continue  # Avoid division by zero
+
+        if (date, sector, sub_industry) in existing_record:
+            existing_stat = session.query(Equity_Stats).filter_by(date=date, sector=sector, gics_sub_industry=sub_industry).first()
+            existing_stat.change_day = change_avg_weighted
+            existing_stat.atr = atr_avg_weighted
+        else:
             new_stat = Equity_Stats(
                 sector=sector,
-                gics_sub_industry=sub_industry,
+                industry=sub_industry,
                 date=date,
-                change_day=change_avg,
-                atr=atr_avg
+                change_day=change_avg_weighted,
+                atr=atr_avg_weighted
             )
             session.add(new_stat)
 

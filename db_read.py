@@ -1,5 +1,5 @@
 import sqlalchemy
-from db import Equity, Commodity_Stats
+from db import Equity, Commodity_Stats, Equity_Stats, MacroeconomicData
 
 # Create a SQLAlchemy engine to connect to the database
 engine = sqlalchemy.create_engine('postgresql+psycopg2://postgres:postgres@localhost/db')
@@ -8,12 +8,12 @@ engine = sqlalchemy.create_engine('postgresql+psycopg2://postgres:postgres@local
 Session = sqlalchemy.orm.sessionmaker(bind=engine)
 session = Session()
 
-# Query the first 50 entries in the Commodity_Stats table
-results = session.query(Commodity_Stats).limit(50).all()
+# Query the Unemployment Rate for each day between September 1 and October 1, 2004
+results = session.query(MacroeconomicData).filter(MacroeconomicData.date >= '2004-08-01', MacroeconomicData.date <= '2004-10-01', MacroeconomicData.metric == 'Unemployment Rate').all()
 
-# Print each row
-for row in results:
-    print(row.date, row.metal, row.change_day, row.atr)
+for result in results:
+    print(result.date, result.metric, result.value)
+
 
 # Close the session
 session.close()
