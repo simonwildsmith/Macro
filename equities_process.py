@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, sessionmaker
 from sqlalchemy.sql import func
 from db import Equity, Equity_Stats, Base
 from datetime import datetime
+from tqdm import tqdm
 
 # Database configuration
 DATABASE_URI = 'postgresql+psycopg2://postgres:postgres@localhost/db'

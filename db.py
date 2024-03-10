@@ -37,28 +37,37 @@ class Commodity(Base):
 
     id = Column(Integer, primary_key=True)
     date = Column(Date)
-    GOLD = Column(Float)
-    COPPER = Column(Float)
-    CRUDE_OIL = Column(Float)
-    NICKEL = Column(Float)
-    PALLADIUM = Column(Float)
-    PLATINUM = Column(Float)
-    IRON = Column(Float)
+    metal = Column(String)
+    open = Column(Float)
+    high = Column(Float)
+    low = Column(Float)
+    close = Column(Float)
+    volume = Column(Integer)
 
-#series_id from FRED
+class Commodity_Stats(Base):
+    __tablename__ = 'commodity_stats'
+
+    id = Column(Integer, primary_key=True)
+    metal = Column(String)
+    date = Column(Date)
+    change_day = Column(Float)
+    atr = Column(Float)
 
 class MacroeconomicData(Base):
     __tablename__ = 'macroeconomic_data'
 
     id = Column(Integer, primary_key=True)
     date = Column(Date)
-    unemployment_rate = Column(Float) #series_id: UNRATENSA
-    gdp_growth = Column(Float) #series_id: A191RP1Q027SBEA
-    real_gdp_growth = Column(Float) #series_id: A191RL1Q225SBEA
-    fed_funds_rate = Column(Float) #series_id: DFF
-    consumer_price_index = Column(Float) #series_id: CPIAUCSL
-    ten_year_minus_two_year_treasury = Column(Float) #series_id: T10Y2Y
-    m2_money_supply = Column(Float) #series_id: M2SL
+    metric = Column(String)
+    value = Column(Float)
+
+    #unemployment_rate = Column(Float) #series_id: UNRATENSA
+    #gdp_growth = Column(Float) #series_id: A191RP1Q027SBEA
+    #real_gdp_growth = Column(Float) #series_id: A191RL1Q225SBEA
+    #fed_funds_rate = Column(Float) #series_id: DFF
+    #consumer_price_index = Column(Float) #series_id: CPIAUCSL
+    #ten_year_minus_two_year_treasury = Column(Float) #series_id: T10Y2Y
+    #m2_money_supply = Column(Float) #series_id: M2SL
 
 # Create tables
 if __name__ == '__main__':

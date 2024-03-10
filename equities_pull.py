@@ -23,6 +23,7 @@ with open('nasdaq_full_tickers.json', 'r') as file:
 def business_days(start_date, end_date):
     return pd.date_range(start=start_date, end=end_date, freq=BDay())
 
+# Returns stock data from Yahoo Finance
 def fetch_stock_data(ticker_symbol, start_date, end_date):
     stock = yf.Ticker(ticker_symbol)
     data = stock.history(start=start_date, end=end_date)
@@ -90,7 +91,7 @@ while ticker_index < len(nasdaq_tickers):
     ticker = nasdaq_tickers[ticker_index]
     symbol = ticker['symbol']
     sector = ticker['sector']
-    industry = tickerl['industry']
+    industry = ticker['industry']
 
     try:
         stock_data = fetch_stock_data(symbol, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
