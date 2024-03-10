@@ -8,12 +8,11 @@ engine = sqlalchemy.create_engine('postgresql+psycopg2://postgres:postgres@local
 Session = sqlalchemy.orm.sessionmaker(bind=engine)
 session = Session()
 
-# Query the Unemployment Rate for each day between September 1 and October 1, 2004
-results = session.query(MacroeconomicData).filter(MacroeconomicData.date >= '2004-08-01', MacroeconomicData.date <= '2004-10-01', MacroeconomicData.metric == 'Unemployment Rate').all()
+# Query the Equity table for records where the open and close values are the same
+results = session.query(Equity).filter(Equity.open == Equity.close).limit(50).all()
 
 for result in results:
-    print(result.date, result.metric, result.value)
-
+    print(result.date, result.ticker, result.open, result.close, result.volume)
 
 # Close the session
 session.close()
