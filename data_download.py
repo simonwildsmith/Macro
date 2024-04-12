@@ -4,6 +4,9 @@ import numpy as np
 from kaggle.api.kaggle_api_extended import KaggleApi
 from pandas.tseries.offsets import BDay
 
+# take a look at potentially including UMCSENT, data to feb 2024
+# review code to handle quartely data noted on non business days
+
 # Initialize Kaggle API
 api = KaggleApi()
 api.authenticate()
