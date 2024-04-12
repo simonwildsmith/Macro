@@ -29,11 +29,18 @@ def load_and_clean_data(file_path, date_col_index, value_col_index, percent_chan
 
         df.dropna(inplace=True)  # Remove missing values
 
+        df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        df.dropna(inplace=True)  # Remove non-numeric values
+
+        print(f"file path: {file_path}")
+        print(f"min date: {df['Date'].min()}")
+        
+
         # Interpolate missing values for business days
         all_business_days = pd.date_range(start=df['Date'].min(), 
                                           end=df['Date'].max(), 
                                           freq=BDay())
-        df = df.set_index('Date').reindex(all_business_days).ffill()
+        df = df.set_index('Date').reindex(all_business_days).interpolate(method='linear')
 
         # Convert data to percent change if requested
         if percent_change:
