@@ -19,36 +19,42 @@ def download_dataset(dataset_name, path='datasets/'):
 
 def load_and_clean_data(file_path, date_col_index, value_col_index, percent_change=False):
     """
-    Loads a CSV file, cleans the data, interpolates missing business days, 
-    and optionally converts values to percent change from the previous data point.
+    Loads a CSV file, cleans the data, performs interpolation only across quarters
+    where changes occur, and optionally converts values to percent change from the previous
+    business day data point.
     """
     try:
         df = pd.read_csv(file_path)
-        
-        # Select only the relevant columns based on provided indices
         df = df.iloc[:, [date_col_index, value_col_index]]
-        df.columns = ['Date', 'Value']  # Renaming for consistency
+        df.columns = ['Date', 'Value']
         df['Date'] = pd.to_datetime(df['Date'])
+        df.dropna(inplace=True)
 
-        df.dropna(inplace=True)  # Remove missing values
+        # Reindex to include all calendar days
+        all_days = pd.date_range(start=df['Date'].min(), end=df['Date'].max(), freq='D')
+        df = df.set_index('Date').reindex(all_days)
+        df['Value'] = df['Value'].ffill()  # Forward fill to maintain data continuity
 
-        df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
-        df.dropna(inplace=True)  # Remove non-numeric values
+        # Detect where actual changes occur
+        changes = df['Value'].diff().fillna(0) != 0
+        change_dates = changes[changes].index
 
-        print(f"file path: {file_path}")
-        print(f"min date: {df['Date'].min()}")
-        
+        # Include the first row explicitly as a change point
+        if change_dates[0] != df.index.min():
+            change_dates = change_dates.insert(0, df.index.min())
 
-        # Interpolate missing values for business days
-        all_business_days = pd.date_range(start=df['Date'].min(), 
-                                          end=df['Date'].max(), 
-                                          freq=BDay())
-        df = df.set_index('Date').reindex(all_business_days).interpolate(method='linear')
+        # Perform linear interpolation between change points
+        for start, end in zip(change_dates, change_dates[1:]):
+            if end > start:  # Ensure there is more than one day to interpolate
+                df.loc[start:end, 'Value'] = np.linspace(df.at[start, 'Value'], df.at[end, 'Value'], (end - start).days + 1)
+        # Filter to only include business days
+        business_days = all_days.to_series().dt.dayofweek < 5
+        df = df[business_days]
 
-        # Convert data to percent change if requested
+        # Calculate percent change on business days if requested
         if percent_change:
             df['Value'] = df['Value'].pct_change() * 100
-            df.dropna(inplace=True)  # Remove NaN values created by pct_change
+            df.dropna(inplace=True)  # Removes NaNs created by pct_change
 
         return df.reset_index().rename(columns={'index': 'Date'})
     except Exception as e:
