@@ -17,83 +17,107 @@ def download_dataset(dataset_name, path='datasets/'):
     """
     api.dataset_download_files(dataset_name, path=path, unzip=True)
 
-def load_and_clean_data(file_path, date_col_index, value_col_index, percent_change=False):
+def load_and_clean_data(file_path, date_col_index, value_col_index, percent_change=False, interpolate=True):
     """
-    Loads a CSV file, cleans the data, performs interpolation only across quarters
-    where changes occur, and optionally converts values to percent change from the previous
-    business day data point.
+    Loads a dataset from a CSV file, cleans it, and returns a DataFrame.
+    The dataset is cleaned by:
+    1. Parsing the date column and value column
+    2. Reindexing to include all calendar days
+    3. Forward filling to maintain data continuity
+    4. Optionally interpolating between change points
+    5. Optionally calculating percent change from the previous business day
     """
     try:
         df = pd.read_csv(file_path)
         df = df.iloc[:, [date_col_index, value_col_index]]
         df.columns = ['Date', 'Value']
-        df['Date'] = pd.to_datetime(df['Date'])
-        df.dropna(inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')  # Ensure date parsing with error handling
+        df['Value'] = pd.to_numeric(df['Value'], errors='coerce')  # Convert Value to numeric, handling errors
+        df.dropna(subset=['Date', 'Value'], inplace=True)  # Drop rows where Date or Value could not be parsed
 
         # Reindex to include all calendar days
         all_days = pd.date_range(start=df['Date'].min(), end=df['Date'].max(), freq='D')
-        df = df.set_index('Date').reindex(all_days)
+        df.set_index('Date', inplace=True)
+        df = df.reindex(all_days)
         df['Value'] = df['Value'].ffill()  # Forward fill to maintain data continuity
 
-        # Detect where actual changes occur
-        changes = df['Value'].diff().fillna(0) != 0
-        change_dates = changes[changes].index
-
-        # Include the first row explicitly as a change point
-        if change_dates[0] != df.index.min():
-            change_dates = change_dates.insert(0, df.index.min())
-
-        # Perform linear interpolation between change points
-        for start, end in zip(change_dates, change_dates[1:]):
-            if end > start:  # Ensure there is more than one day to interpolate
-                df.loc[start:end, 'Value'] = np.linspace(df.at[start, 'Value'], df.at[end, 'Value'], (end - start).days + 1)
-        # Filter to only include business days
+        # Filter to only include business days before identifying change points
         business_days = all_days.to_series().dt.dayofweek < 5
-        df = df[business_days]
+        business_df = df[business_days].copy()
+
+        # Interpolate between change points if requested
+        if interpolate:
+            # Detect where actual changes occur
+            changes = business_df['Value'].diff().fillna(0) != 0
+            change_dates = changes[changes].index
+
+            # Include the first row explicitly as a change point
+            if change_dates.empty or change_dates[0] != business_df.index.min():
+                change_dates = change_dates.insert(0, business_df.index.min())
+
+            # Perform linear interpolation between change points
+            for start, end in zip(change_dates, change_dates[1:]):
+                if end > start:  # Ensure there is more than one day to interpolate
+                    indices = business_df.loc[start:end].index
+                    business_df.loc[indices, 'Value'] = np.linspace(business_df.at[start, 'Value'], business_df.at[end, 'Value'], len(indices))
 
         # Calculate percent change on business days if requested
         if percent_change:
-            df['Value'] = df['Value'].pct_change() * 100
-            df.dropna(inplace=True)  # Removes NaNs created by pct_change
+            business_df['Value'] = business_df['Value'].pct_change() * 100
+            business_df.dropna(inplace=True)  # Removes NaNs created by pct_change
 
-        return df.reset_index().rename(columns={'index': 'Date'})
+        return business_df.reset_index().rename(columns={'index': 'Date'})
     except Exception as e:
         print(f"Error loading {file_path}: {e}")
         return None
     
 def main():
-    # List of your datasets on Kaggle
+    # List of datasets on Kaggle
+    # Each dataset is a tuple with the following elements:
+    # 1. Dataset name on Kaggle
+    # 2. Index of the date column in the dataset
+    # 3. Index of the value column in the dataset
+    # 4. Whether to calculate percent change from the previous business day
+    # 5. Whether to interpolate between change points
     datasets = {
+        # Dataset frequency: daily including weekends
         'simonwildsmith/us-uncertainty-index': \
-            ['United States uncertainty index', 0, 1, False],
+            ['United States uncertainty index', 0, 1, False, False],
+        # Dataset frequency: daily not including weekends
         'simonwildsmith/10y-2y-tbill-constant-maturity': \
-            ['T10Y2Y', 0, 1, False],
+            ['T10Y2Y', 0, 1, False, False],
+        # Dataset frequency: daily not including weekends
         'simonwildsmith/us-dollar-index': \
-            ['US Dollar Index (DXY)', 0, 4, False],
+            ['US Dollar Index (DXY)', 0, 4, False, False],
+        # Dataset frequency: quarterly, data may lie on non-business days
         'simonwildsmith/gdp-growth-quarterly-from-preceding-period': \
-            ['GDP growth', 0, 1, False],
+            ['GDP growth', 0, 1, False, True],
+        # Dataset frequency: monthly, data may lie on non-business days
         'simonwildsmith/us-unemployment-rate': \
-            ['Unemployment Rate', 0, 1, False],
+            ['Unemployment Rate', 0, 1, False, True],
+        # Dataset frequency: monthly, data may lie on non-business days
         'simonwildsmith/consumer-price-index-monthly-seasonally-adjusted': \
-            ['Consumer Price Index', 0, 1, False],
+            ['Consumer Price Index', 0, 1, True, True],
+        # Dataset frequency: daily including weekends
         'simonwildsmith/federal-funds-effective-rate-1979-march-2024': \
-            ['Effective Funds Rate DFF', 0, 1, False],
+            ['Effective Funds Rate DFF', 0, 1, False, False],
+        # Dataset frequency: daily not including weekends
         'simonwildsmith/historical-gold-prices-march-2024': \
-            ['Historical Gold Prices', 0, 1, False],
+            ['Historical Gold Prices', 0, 1, True, False],
     }
 
     cleaned_data_dir = 'datasets/cleaned'
+
     if not os.path.exists(cleaned_data_dir):
         os.makedirs(cleaned_data_dir)
 
-    for dataset_name, (download_name, date_col_index, value_col_index, percent_change) in datasets.items():
+    for dataset_name, (download_name, date_col_index, value_col_index, percent_change, interpolate) in datasets.items():
         print(f"Downloading {dataset_name}...")
         download_dataset(dataset_name)
 
         file_path = os.path.join('datasets', download_name + '.csv')
         
-        print(f"Processing {file_path}...")
-        df = load_and_clean_data(file_path, date_col_index, value_col_index, percent_change)
+        df = load_and_clean_data(file_path, date_col_index, value_col_index, percent_change, interpolate)
         
         if df is not None:
             clean_file_path = os.path.join('datasets', 'cleaned', download_name + '_cleaned.csv')
