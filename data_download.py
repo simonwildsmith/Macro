@@ -32,6 +32,7 @@ def load_and_clean_data(file_path, date_col_index, value_col_index, percent_chan
         df = df.iloc[:, [date_col_index, value_col_index]]
         df.columns = ['Date', 'Value']
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')  # Ensure date parsing with error handling
+        df['Value'] = df['Value'].replace(',', '', regex=True)  # Remove commas from numbers (e.g., 1,000 -> 1000
         df['Value'] = pd.to_numeric(df['Value'], errors='coerce')  # Convert Value to numeric, handling errors
         df.dropna(subset=['Date', 'Value'], inplace=True)  # Drop rows where Date or Value could not be parsed
 
@@ -70,7 +71,30 @@ def load_and_clean_data(file_path, date_col_index, value_col_index, percent_chan
     except Exception as e:
         print(f"Error loading {file_path}: {e}")
         return None
+
+def merge_data(cleaned_data_dir='datasets/cleaned', output_file='merged.csv'):
+    """
+    Merges all cleaned data files into a single DataFrame where each column corresponds to a dataset.
+    Only includes dates that have entries in all columns.
+    """
+    files = [os.path.join(cleaned_data_dir, f) for f in os.listdir(cleaned_data_dir) if f.endswith('_cleaned.csv')]
+    data_frames = []
     
+    for file in files:
+        df = pd.read_csv(file)
+        df['Date'] = pd.to_datetime(df['Date'])
+        df.set_index('Date', inplace=True)
+        # Ensure the column names are unique by naming them after the files
+        df.rename(columns={'Value': os.path.splitext(os.path.basename(file))[0]}, inplace=True)
+        data_frames.append(df)
+    
+    # Merge all dataframes on the 'Date' index
+    merged_df = pd.concat(data_frames, axis=1, join='inner')  # 'inner' join to only keep dates present in all files
+    
+    # Save the merged DataFrame
+    merged_df.reset_index().to_csv(os.path.join(cleaned_data_dir, output_file), index=False)
+    print(f"Merged data saved to {os.path.join(cleaned_data_dir, output_file)}")
+
 def main():
     # List of datasets on Kaggle
     # Each dataset is a tuple with the following elements:
@@ -104,6 +128,12 @@ def main():
         # Dataset frequency: daily not including weekends
         'simonwildsmith/historical-gold-prices-march-2024': \
             ['Historical Gold Prices', 0, 1, True, False],
+        # Dataset frequency: monthly, data may lie on non-business days
+        'simonwildsmith/m2-money-supply': \
+            ['M2SL', 0, 1, True, True],
+        # Dataset frequency: monthly, data may lie on non-business days
+        'simonwildsmith/umcsent': \
+            ['UMCSENT', 0, 1, False, True]
     }
 
     cleaned_data_dir = 'datasets/cleaned'
@@ -123,6 +153,8 @@ def main():
             clean_file_path = os.path.join('datasets', 'cleaned', download_name + '_cleaned.csv')
             df.to_csv(clean_file_path, index=False)
             print(f"Saved cleaned data to {clean_file_path}")
+
+    merge_data()
 
 if __name__ == "__main__":
     main()
