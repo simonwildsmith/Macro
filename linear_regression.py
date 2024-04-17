@@ -4,6 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import torch
 from torch.utils.data import TensorDataset, DataLoader
+import torch.nn as nn
 
 
 """
@@ -50,3 +51,63 @@ print(f"Test set shape: {X_test.shape}, {y_test.shape}")
 """
 Setup Pytorch for a Simple Linear Model
 """
+
+# Convert arrays to PyTorch tensors
+train_features = torch.tensor(X_train, dtype=torch.float32)
+train_targets = torch.tensor(y_train.values, dtype=torch.float32).view(-1, 1)
+val_features = torch.tensor(X_val, dtype=torch.float32)
+val_targets = torch.tensor(y_val.values, dtype=torch.float32).view(-1, 1)
+test_features = torch.tensor(X_test, dtype=torch.float32)
+test_targets = torch.tensor(y_test.values, dtype=torch.float32).view(-1, 1)
+
+# Create Tensor Datasets
+train_dataset = TensorDataset(train_features, train_targets)
+val_dataset = TensorDataset(val_features, val_targets)
+test_dataset = TensorDataset(test_features, test_targets)
+
+# Create Data Loaders
+batch_size = 64
+train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
+test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+
+"""
+Step 3: Define the model
+"""
+
+
+class LinearRegressionModel(nn.Module):
+    def __init__(self, input_size):
+        super(LinearRegressionModel, self).__init__()
+        self.linear = nn.Linear(input_size, 1)
+
+        def forward(self, x):
+            return self.linear(x)
+
+
+# Initialize the model
+input_size = X_train.shape[1]
+model = LinearRegressionModel(input_size)
+
+# Define the loss function and optimizer
+criterion = nn.MSELoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+
+"""
+Step 4: Train the model
+"""
+
+
+# Functio to perform a training epoch
+def train_model(model, train_loader, criterion, optimizer):
+    model.train()
+    running_loss = 0.0
+    for inputs, targets in train_loader:
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        loss = criterion(outputs, targets)
+        loss.backward()
+        optimizer.step()
+        running_loss += loss.item() * inputs.size(0)
+    epoch_loss = running_loss / len(train_loader.dataset)
+    return epoch_loss
