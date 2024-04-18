@@ -112,6 +112,7 @@ def train_model(model, train_loader, criterion, optimizer):
     epoch_loss = running_loss / len(train_loader.dataset)
     return epoch_loss
 
+
 num_epochs = 100
 for epoch in range(num_epochs):
     train_loss = train_model(model, train_loader, criterion, optimizer)
@@ -120,6 +121,7 @@ for epoch in range(num_epochs):
 """
 Step 5: Evaluate the model
 """
+
 
 # Function to evaluate the model
 def evaluate_model(model, val_loader, criterion):
@@ -133,9 +135,11 @@ def evaluate_model(model, val_loader, criterion):
     epoch_loss = running_loss / len(val_loader.dataset)
     return epoch_loss
 
+
 # Evaluate the model
 val_loss = evaluate_model(model, val_loader, criterion)
 print(f"Validation Loss: {val_loss:.4f}")
+
 
 def predict(model, test_loader):
     model.eval()  # Set the model to evaluation mode
@@ -143,8 +147,11 @@ def predict(model, test_loader):
     with torch.no_grad():  # Inference mode, gradients not needed
         for inputs, _ in test_loader:
             outputs = model(inputs)
-            predictions.extend(outputs.view(-1).tolist())  # Flatten outputs and convert to list
+            predictions.extend(
+                outputs.view(-1).tolist()
+            )  # Flatten outputs and convert to list
     return predictions
+
 
 # Predict the test set
 test_predictions = predict(model, test_loader)
