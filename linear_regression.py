@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 import torch.nn as nn
+import matplotlib.pyplot as plt
 
 
 """
@@ -29,8 +30,8 @@ if data.isnull().values.any():
     print(f"Number of rows removed: {num_rows_removed}")
 
 # Split the data into features and target
-X = data.drop(columns=["Date", "Historical Gold Prices"])
-y = data["Historical Gold Prices"]
+X = data.drop(columns=["Date", "Historical Gold Prices_cleaned"])
+y = data["Historical Gold Prices_cleaned"]
 
 # Normalize the features
 scaler = StandardScaler()
@@ -81,8 +82,8 @@ class LinearRegressionModel(nn.Module):
         super(LinearRegressionModel, self).__init__()
         self.linear = nn.Linear(input_size, 1)
 
-        def forward(self, x):
-            return self.linear(x)
+    def forward(self, x):
+        return self.linear(x)
 
 
 # Initialize the model
@@ -91,39 +92,44 @@ model = LinearRegressionModel(input_size)
 
 # Define the loss function and optimizer
 criterion = nn.MSELoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
 
 """
-Step 4: Train the model
-"""
-
-
-# Functio to perform a training epoch
-def train_model(model, train_loader, criterion, optimizer):
-    model.train()
-    running_loss = 0.0
-    for inputs, targets in train_loader:
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, targets)
-        loss.backward()
-        optimizer.step()
-        running_loss += loss.item() * inputs.size(0)
-    epoch_loss = running_loss / len(train_loader.dataset)
-    return epoch_loss
-
-
-num_epochs = 100
-for epoch in range(num_epochs):
-    train_loss = train_model(model, train_loader, criterion, optimizer)
-    print(f"Epoch {epoch+1}/{num_epochs}, Loss: {train_loss:.4f}")
-
-"""
-Step 5: Evaluate the model
+Step 4: Train the model concurrently with the validation set
 """
 
 
-# Function to evaluate the model
+def train_and_evaluate(
+    model, train_loader, val_loader, criterion, optimizer, num_epochs
+):
+    train_losses = []
+    val_losses = []
+
+    for epoch in range(num_epochs):
+        # Training
+        model.train()
+        train_loss = 0.0
+        for inputs, targets in train_loader:
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item() * inputs.size(0)
+        train_loss /= len(train_loader.dataset)
+        train_losses.append(train_loss)
+
+        # Validation
+        val_loss = evaluate_model(model, val_loader, criterion)
+        val_losses.append(val_loss)
+
+        print(
+            f"Epoch {epoch+1}/{num_epochs}, Training Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f})"
+        )
+
+    return train_losses, val_losses
+
+
 def evaluate_model(model, val_loader, criterion):
     model.eval()
     running_loss = 0.0
@@ -132,13 +138,7 @@ def evaluate_model(model, val_loader, criterion):
             outputs = model(inputs)
             loss = criterion(outputs, targets)
             running_loss += loss.item() * inputs.size(0)
-    epoch_loss = running_loss / len(val_loader.dataset)
-    return epoch_loss
-
-
-# Evaluate the model
-val_loss = evaluate_model(model, val_loader, criterion)
-print(f"Validation Loss: {val_loss:.4f}")
+    return running_loss / len(val_loader.dataset)
 
 
 def predict(model, test_loader):
@@ -153,6 +153,22 @@ def predict(model, test_loader):
     return predictions
 
 
-# Predict the test set
-test_predictions = predict(model, test_loader)
-print(test_predictions[:5])  # Print first five predictions
+"""
+Step 5: Plot the losses
+"""
+
+num_epochs = 100
+train_losses, val_losses = train_and_evaluate(
+    model, train_loader, val_loader, criterion, optimizer, num_epochs
+)
+
+# Plotting the training and validation losses
+plt.figure(figsize=(10, 6))
+plt.plot(train_losses, label="Training Loss")
+plt.plot(val_losses, label="Validation Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Training and Validation Loss")
+plt.legend()
+plt.show()
+plt.grid(True)
