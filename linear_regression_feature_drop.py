@@ -30,7 +30,6 @@ if data.isnull().values.any():
     print(f"Number of rows removed: {num_rows_removed}")
 
 
-
 # Split the data into features and target
 X = data.drop(columns=["Date", "Historical Gold Prices_cleaned"])
 y = data["Historical Gold Prices_cleaned"]
@@ -47,6 +46,7 @@ X_val, X_test, y_val, y_test = train_test_split(
     X_temp, y_temp, test_size=0.5, random_state=42
 )
 
+
 class LinearRegressionModel(nn.Module):
     def __init__(self, input_size):
         super(LinearRegressionModel, self).__init__()
@@ -54,6 +54,7 @@ class LinearRegressionModel(nn.Module):
 
     def forward(self, x):
         return self.linear(x)
+
 
 def train_and_evaluate(X_train, y_train, X_val, y_val):
     # Convert data into PyTorch tensors
@@ -87,3 +88,18 @@ def train_and_evaluate(X_train, y_train, X_val, y_val):
     # Validation loss
     val_loss = evaluate_model(model, val_loader, criterion)
     return val_loss
+
+
+def evaluate_model(model, val_loader, criterion):
+    model.eval()
+    running_loss = 0.0
+    with torch.no_grad():
+        for inputs, targets in val_loader:
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            running_loss += loss.item() * inputs.size(0)
+    return running_loss / len(val_loader.dataset)
+
+
+original_features = X.columns.tolist()
+loss_results = {}

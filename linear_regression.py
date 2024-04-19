@@ -124,12 +124,9 @@ def train_and_evaluate(
         val_loss = evaluate_model(model, val_loader, criterion)
         val_losses.append(val_loss)
 
-        print(
-            f"Epoch {epoch+1}/{num_epochs}, Training Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f})"
-        )
+        print(f"Epoch {epoch+1}/{num_epochs}, Training Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f})")
 
     return train_losses, val_losses
-
 
 def evaluate_model(model, val_loader, criterion):
     model.eval()
@@ -140,7 +137,6 @@ def evaluate_model(model, val_loader, criterion):
             loss = criterion(outputs, targets)
             running_loss += loss.item() * inputs.size(0)
     return running_loss / len(val_loader.dataset)
-
 
 def predict(model, test_loader):
     model.eval()  # Set the model to evaluation mode
