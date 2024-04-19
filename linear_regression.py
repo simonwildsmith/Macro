@@ -29,6 +29,7 @@ if data.isnull().values.any():
     num_rows_removed = num_rows_before - num_rows_after
     print(f"Number of rows removed: {num_rows_removed}")
 
+
 # Split the data into features and target
 X = data.drop(columns=["Date", "Historical Gold Prices_cleaned"])
 y = data["Historical Gold Prices_cleaned"]
@@ -92,7 +93,7 @@ model = LinearRegressionModel(input_size)
 
 # Define the loss function and optimizer
 criterion = nn.MSELoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.0005)
 
 """
 Step 4: Train the model concurrently with the validation set
@@ -157,7 +158,7 @@ def predict(model, test_loader):
 Step 5: Plot the losses
 """
 
-num_epochs = 100
+num_epochs = 300
 train_losses, val_losses = train_and_evaluate(
     model, train_loader, val_loader, criterion, optimizer, num_epochs
 )
@@ -169,6 +170,31 @@ plt.plot(val_losses, label="Validation Loss")
 plt.xlabel("Epoch")
 plt.ylabel("Loss")
 plt.title("Training and Validation Loss")
+plt.legend()
+plt.show()
+plt.grid(True)
+
+# Evaluate the model on the test set
+test_loss = evaluate_model(model, test_loader, criterion)
+print(f"Test Loss: {test_loss:.4f}")
+
+"""
+Step 6: Make predictions
+"""
+
+# Make Predictios on the test set and plot them
+predictions = predict(model, test_loader)
+
+assert len(predictions) == len(
+    y_test
+), "Number of predictions must match number of test samples"
+
+plt.figure(figsize=(10, 6))
+plt.plot(y_test.values, label="True")
+plt.plot(predictions, label="Predicted")
+plt.xlabel("Sample")
+plt.ylabel("Price")
+plt.title("True vs Predicted Prices")
 plt.legend()
 plt.show()
 plt.grid(True)
